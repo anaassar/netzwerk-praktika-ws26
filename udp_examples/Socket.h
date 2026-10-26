@@ -35,4 +35,13 @@ ssize_t Recvfrom(int sockfd,
 
 int Close(int fd);
 
+int Connect(int sockfd, const struct sockaddr *addr,
+            socklen_t addrlen);
+
+ssize_t Send(int sockfd, const void *buf,
+             size_t len, int flags);
+
+ssize_t Recv(int sockfd, void *buf,
+             size_t len, int flags);
+
 #endif

@@ -1,0 +1,30 @@
+
+# Ejecutables
+echo_client
+echo_server
+echo_client_connected
+echo_client_test
+
+# Archivos objeto y dependencias
+*.o
+.deps/
+
+# Archivos generados por Autotools
+Makefile.in
+aclocal.m4
+autom4te.cache/
+compile
+configure
+config.log
+config.status
+config.sub
+config.guess
+depcomp
+install-sh
+missing
+Makefile
+stamp-h1
+
+# Metadatos de macOS
+.DS_Store
+._*

@@ -25,12 +25,16 @@
  */
 
 
-
-#include <winsock2.h>
-#define close closesocket
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <string.h>
+#include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "Socket.h"
+#define close closesocket
+
 
 #define BUFFER_SIZE (1<<16)
 

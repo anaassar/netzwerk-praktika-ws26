@@ -1,11 +1,9 @@
-
 #include <sys/types.h>
-#include <io.h>
-
-#include "Socket.h"
-
+#include <sys/socket.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "Socket.h"
 
 int Socket(int domain, int type, int protocol)
 {
@@ -81,4 +79,43 @@ int Close(int fd)
     }
 
     return 0;
+}
+
+int Connect(int sockfd, const struct sockaddr *addr,
+            socklen_t addrlen)
+{
+    int result = connect(sockfd, addr, addrlen);
+
+    if (result < 0) {
+        perror("connect");
+        exit(EXIT_FAILURE);
+    }
+
+    return result;
+}
+
+ssize_t Send(int sockfd, const void *buf,
+             size_t len, int flags)
+{
+    ssize_t result = send(sockfd, buf, len, flags);
+
+    if (result < 0) {
+        perror("send");
+        exit(EXIT_FAILURE);
+    }
+
+    return result;
+}
+
+ssize_t Recv(int sockfd, void *buf,
+             size_t len, int flags)
+{
+    ssize_t result = recv(sockfd, buf, len, flags);
+
+    if (result < 0) {
+        perror("recv");
+        exit(EXIT_FAILURE);
+    }
+
+    return result;
 }

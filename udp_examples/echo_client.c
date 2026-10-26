@@ -27,7 +27,6 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include "Socket.h"
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -39,6 +38,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "Socket.h"
 
 #ifdef _WIN32
 typedef int ssize_t;
@@ -73,10 +73,10 @@ main(int argc, char **argv)
 
     server_addr.sin_port = htons(7);
 
-    if (inet_addr(AF_INET, argv[1],
-                &server_addr.sin_addr) != 1) {
+    if (inet_pton(AF_INET, argv[1],
+                  &server_addr.sin_addr) != 1) {
         fprintf(stderr, "Invalid IPv4 address\n");
-        Close(fd);z
+        Close(fd);
         return EXIT_FAILURE;
     }
 
