@@ -4,6 +4,9 @@ echo_client
 echo_server
 echo_client_connected
 echo_client_test
+client
+daytime_server
+discard_server
 
 # Archivos objeto y dependencias
 *.o

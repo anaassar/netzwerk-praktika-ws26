@@ -2,6 +2,9 @@
 
 ## compile
 gcc -Wall -Wextra -std=c99 -pedantic client.c -o client
+gcc -Wall -Wextra -std=c99 -pedantic daytime_server.c -o daytime_server
+gcc -Wall -Wextra -std=c99 -pedantic discard_server.c -o discard_server
+gcc -Wall -Wextra -std=c99 -pedantic -pthread echo_server.c -o echo_server
 -Wall: activa advertencias comunes.
 -Wextra: activa advertencias adicionales.
 -std=c99: utiliza el estándar C99.
@@ -9,17 +12,27 @@ gcc -Wall -Wextra -std=c99 -pedantic client.c -o client
 -o client: establece el nombre del ejecutable.
 
 
-gcc -Wall -Wextra -std=c99 -pedantic daytime_server.c -o daytime_server
-
 ### servidor de prueba
 nc -l 12345
 python3 test_server.py
-
+--
 ## run
+###aufgabe 1
+nc -l 12345
 ./client 127.0.0.1 12345
+
+###aufgabe 2
 sudo ./daytime_server 13
 ./daytime_server 1313
+./client 127.0.0.1 13
+
+###aufgabe 3
 sudo ./discard_server 9
 ./discard_server 9009
+./client 127.0.0.1 9
+
+###aufgabe 4
+sudo ./echo_server 7
+./client 127.0.0.1 7
 
 Ctrl + D en el cliente para cerrar stdin
