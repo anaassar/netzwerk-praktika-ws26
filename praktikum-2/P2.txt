@@ -1,0 +1,25 @@
+
+
+## compile
+gcc -Wall -Wextra -std=c99 -pedantic client.c -o client
+-Wall: activa advertencias comunes.
+-Wextra: activa advertencias adicionales.
+-std=c99: utiliza el estándar C99.
+-pedantic: comprueba el cumplimiento del estándar.
+-o client: establece el nombre del ejecutable.
+
+
+gcc -Wall -Wextra -std=c99 -pedantic daytime_server.c -o daytime_server
+
+### servidor de prueba
+nc -l 12345
+python3 test_server.py
+
+## run
+./client 127.0.0.1 12345
+sudo ./daytime_server 13
+./daytime_server 1313
+sudo ./discard_server 9
+./discard_server 9009
+
+Ctrl + D en el cliente para cerrar stdin
