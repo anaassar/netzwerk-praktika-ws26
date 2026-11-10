@@ -21,18 +21,23 @@ python3 test_server.py
 nc -l 12345
 ./client 127.0.0.1 12345
 
+
 ###aufgabe 2
 sudo ./daytime_server 13
-./daytime_server 1313
 ./client 127.0.0.1 13
+./daytime_server 1313
+./client ::1 1313
 
 ###aufgabe 3
 sudo ./discard_server 9
-./discard_server 9009
 ./client 127.0.0.1 9
+./discard_server 9009
+./client ::! 9009
 
 ###aufgabe 4
 sudo ./echo_server 7
 ./client 127.0.0.1 7
+./echo_server 7007
+./client ::1 7007
 
 Ctrl + D en el cliente para cerrar stdin
