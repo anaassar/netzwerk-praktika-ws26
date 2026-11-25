@@ -1,217 +1,141 @@
-
 #define _POSIX_C_SOURCE 200809L
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <signal.h>
-#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <pthread.h>
+#include "Socket.h"
 
-// EXP: Garantiza que todos los bytes se envíen, incluso si send() solo acepta una parte.
-int send_all(int socket_fd, const char *buffer, size_t length) {
-    size_t total_sent = 0;
+//LAB A4: Servidor echo: puerto estándar 7 (RFC 862)
+//LAB    Se usa si no se indica otro puerto como argumento. Es menor que 1024: necesita privilegios.
+#define ECHO_PORT   (7)
+#define BUFFER_SIZE (1<<16)
 
-    // EXP: Repite el envío mientras queden bytes pendientes.
-    while (total_sent < length) {
+//EXP: Funcion que ejecuta cada hilo para atender a un cliente.
+static void *
+handle_client(void *arg)
+{
+    int client_fd;
+    ssize_t len;
+    char buf[BUFFER_SIZE];
 
-        // EXP: Intenta enviar únicamente los bytes que todavía faltan.
-        ssize_t sent = send(socket_fd,
-                            buffer + total_sent,
-                            length - total_sent, 0);
-
-        if (sent < 0) {
-            // EXP: Si send() fue interrumpido por una señal, vuelve a intentarlo.
-            if (errno == EINTR) {
-                continue;
-            }
-            return -1;
-        }
-
-        if (sent == 0) {
-            return -1;
-        }
-
-        // EXP: Actualiza la cantidad de bytes enviados correctamente.
-        total_sent += (size_t)sent;
-    }
-
-    return 0;
-}
-
-// EXP: Función que ejecutará cada hilo para atender a un cliente.
-void *handle_client(void *arg) {
-
-    // EXP: Recupera el descriptor del cliente recibido como argumento.
-    int client_fd = *(int *)arg;
-
-    // EXP: Libera la memoria reservada para pasar el descriptor al hilo.
+    //EXP: Recuperamos el descriptor y liberamos la memoria reservada en main().
+    client_fd = *(int *)arg;
     free(arg);
 
-    char buffer[4096];
-
     printf("Client handler started (fd=%d)\n", client_fd);
+    fflush(stdout);
 
-    // EXP: Mantiene la comunicación mientras el cliente siga conectado.
-    while (1) {
-
-        // EXP: Recibe los datos enviados por el cliente.
-        ssize_t bytes_received = recv(client_fd, buffer, sizeof(buffer), 0);
-
-        if (bytes_received == 0) {
-            // EXP: recv() devuelve 0 cuando el cliente cierra su dirección de envío.
-            printf("Client disconnected (fd=%d)\n", client_fd);
-            break;
-        }
-
-        if (bytes_received < 0) {
-            // EXP: Si recv() fue interrumpido por una señal, vuelve a intentarlo.
-            if (errno == EINTR) {
-                continue;
-            }
-
-            perror("recv");
-            break;
-        }
-
-        // EXP: Devuelve al cliente todos los bytes recibidos, gestionando posibles envíos parciales.
-        if (send_all(client_fd, buffer, (size_t)bytes_received) == -1) {
-            perror("send");
+    //EXP: Devolvemos todo lo recibido hasta que el cliente cierre (len == 0) o haya un error (len < 0).
+    //LAB A4: Echo: recibe los datos del cliente
+    //LAB    client_fd: conexión de este cliente; buf, sizeof(buf): dónde leer y máximo de bytes; 0: sin opciones.
+    //LAB    > 0: repite mientras lleguen datos; con 0 (el cliente cerró) o -1 (error) el bucle termina.
+    while ((len = Recv(client_fd, buf, sizeof(buf), 0)) > 0) {
+        //EXP: Send_all() repite send() si el kernel solo acepto una parte de los datos.
+        //LAB A4: Echo: devuelve los mismos bytes, también si send() acepta solo una parte
+        //LAB    buf, len: exactamente lo recibido; (size_t) convierte el tipo, len aquí es siempre positivo.
+        //LAB    Send_all() llama a send() varias veces hasta enviar los len bytes; < 0: la conexión falló.
+        if (Send_all(client_fd, buf, (size_t)len) < 0) {
             break;
         }
     }
 
-    // EXP: Cierra el socket del cliente cuando termina su comunicación.
-    close(client_fd);
+    printf("Client disconnected (fd=%d)\n", client_fd);
+    fflush(stdout);
 
-    printf("Client handler finished (fd=%d)\n", client_fd);
-
-    // EXP: Finaliza la ejecución del hilo.
+    Close(client_fd);
     return NULL;
 }
 
-int main(int argc, char *argv[]) {
+int
+main(int argc, char **argv)
+{
+    int fd, client_fd, error;
+    int *arg;
+    int on = 1, off = 0;
+    struct sockaddr_in6 server_addr;
+    pthread_t thread;
 
-    // EXP: Utiliza el puerto 7 por defecto, correspondiente al protocolo Echo (RFC 862).
-    const char *port = (argc == 2) ? argv[1] : "7";
+    //EXP: Puerto 7 por defecto (RFC 862); opcionalmente otro puerto como argumento.
+    if (argc > 2) {
+        fprintf(stderr, "Usage: %s [port]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
 
-    // EXP: Evita que el proceso termine abruptamente al enviar datos a una conexión cerrada.
+    //EXP: Si un cliente se va mientras le enviamos, Send() devuelve -1 (EPIPE) en vez de matar el proceso.
     signal(SIGPIPE, SIG_IGN);
 
-    struct addrinfo hints;
-    struct addrinfo *result, *rp;
+    //EXP: Socket TCP IPv6. Con IPV6_V6ONLY = 0 acepta tambien clientes IPv4.
+    //LAB A4: Servidor echo TCP
+    //LAB    Socket(familia, tipo, protocolo) crea el socket y devuelve su descriptor:
+    //LAB    AF_INET6: familia IPv6 (direcciones sockaddr_in6).
+    //LAB    SOCK_STREAM: flujo de bytes fiable y ordenado, es decir, TCP (SOCK_DGRAM sería UDP).
+    //LAB    0: protocolo por defecto para ese tipo; con SOCK_STREAM es TCP.
+    fd = Socket(AF_INET6, SOCK_STREAM, 0);
+    Setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &off, sizeof(off));
+    Setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
-    // EXP: Inicializa la estructura de configuración.
-    memset(&hints, 0, sizeof(hints));
+    //EXP: memset deja sin6_addr = :: (todas las direcciones locales).
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin6_family = AF_INET6;
 
-    // EXP: Permite utilizar direcciones IPv4 o IPv6.
-    hints.ai_family = AF_UNSPEC;
+#ifdef HAVE_SIN_LEN
+    server_addr.sin6_len = sizeof(server_addr);
+#endif
 
-    // EXP: Indica que se utilizará TCP.
-    hints.ai_socktype = SOCK_STREAM;
+    server_addr.sin6_port = htons(argc == 2 ? Parse_port(argv[1]) : ECHO_PORT);
 
-    // EXP: Configura el programa para utilizar una dirección local como servidor.
-    hints.ai_flags = AI_PASSIVE;
+    Bind(fd, (struct sockaddr *)&server_addr,
+         sizeof(server_addr));
+    Listen(fd, SOMAXCONN);
 
-    // EXP: Obtiene las direcciones locales disponibles para el puerto indicado.
-    if (getaddrinfo(NULL, port, &hints, &result) != 0) {
-        perror("getaddrinfo");
-        return 1;
-    }
+    printf("Echo server listening on port %u...\n", (unsigned)ntohs(server_addr.sin6_port));
+    fflush(stdout);
 
-    int server_fd = -1;
+    for (;;) {
+        client_fd = Accept(fd, NULL, NULL);
 
-    // EXP: Recorre las direcciones disponibles hasta conseguir crear y asociar el socket.
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-
-        // EXP: Crea el socket TCP del servidor.
-        server_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-
-        if (server_fd == -1) {
+        if (client_fd < 0) {
             continue;
         }
 
-        int opt = 1;
+        //EXP: Memoria propia para cada hilo: si pasaramos &client_fd, el siguiente accept() podria sobrescribirlo.
+        arg = malloc(sizeof(int));
 
-        // EXP: Permite reutilizar la dirección local cuando se reinicia el servidor.
-        setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-        // EXP: Asocia el socket a una dirección y puerto local.
-        if (bind(server_fd, rp->ai_addr, rp->ai_addrlen) == 0) {
-            break;
-        }
-
-        // EXP: Cierra el socket si no pudo asociarlo a esta dirección.
-        close(server_fd);
-        server_fd = -1;
-    }
-
-    // EXP: Libera la memoria reservada por getaddrinfo().
-    freeaddrinfo(result);
-
-    if (server_fd == -1) {
-        fprintf(stderr, "Could not bind server socket\n");
-        return 1;
-    }
-
-    // EXP: Pone el socket en modo escucha para aceptar conexiones entrantes.
-    if (listen(server_fd, SOMAXCONN) == -1) {
-        perror("listen");
-        close(server_fd);
-        return 1;
-    }
-
-    printf("Echo server listening on port %s...\n", port);
-
-    // EXP: Mantiene el servidor aceptando nuevos clientes.
-    while (1) {
-
-        // EXP: Acepta una nueva conexión y obtiene un socket para comunicarse con ese cliente.
-        int client_fd = accept(server_fd, NULL, NULL);
-
-        if (client_fd == -1) {
-            if (errno == EINTR) {
-                continue;
-            }
-
-            perror("accept");
-            continue;
-        }
-
-        // EXP: Reserva memoria para pasar el descriptor del cliente al nuevo hilo.
-        int *client_arg = malloc(sizeof(int));
-
-        if (client_arg == NULL) {
+        if (arg == NULL) {
             perror("malloc");
-            close(client_fd);
+            Close(client_fd);
             continue;
         }
 
-        *client_arg = client_fd;
+        *arg = client_fd;
 
-        pthread_t thread;
+        //EXP: pthread_create() devuelve el codigo de error directamente (no usa errno).
+        //LAB A4: Servidor echo basado en hilos
+        //LAB    pthread_create(hilo, atributos, función, argumento) crea un hilo nuevo:
+        //LAB    &thread: aquí guarda el identificador del hilo.
+        //LAB    NULL: atributos por defecto.
+        //LAB    handle_client: función que ejecuta el hilo; atiende a un solo cliente.
+        //LAB    arg: puntero con el descriptor del cliente, en memoria propia (malloc) para que otro accept() no lo cambie.
+        //LAB    Se llama una vez por cada cliente aceptado, así que cada cliente tiene su hilo.
+        //LAB    Devuelve 0 o un código de error (no usa errno).
+        error = pthread_create(&thread, NULL, handle_client, arg);
 
-        // EXP: Crea un hilo independiente que ejecutará handle_client() para atender al cliente.
-        int thread_result = pthread_create(&thread, NULL, handle_client, client_arg);
-
-        if (thread_result != 0) {
-            // EXP: pthread_create() devuelve directamente el código del error.
-            fprintf(stderr, "pthread_create: %s\n", strerror(thread_result));
-
-            free(client_arg);
-            close(client_fd);
+        if (error != 0) {
+            fprintf(stderr, "pthread_create: %s\n", strerror(error));
+            free(arg);
+            Close(client_fd);
             continue;
         }
 
-        // EXP: Desvincula el hilo para que sus recursos se liberen automáticamente cuando termine.
+        //EXP: Los recursos del hilo se liberan solos al terminar; no hace falta pthread_join().
         pthread_detach(thread);
     }
 
-    close(server_fd);
-
-    return 0;
+    Close(fd);
+    return EXIT_SUCCESS;
 }

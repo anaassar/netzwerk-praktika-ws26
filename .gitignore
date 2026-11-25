@@ -7,6 +7,8 @@ echo_client_test
 client
 daytime_server
 discard_server
+getaddresses
+chargen_server
 
 # Archivos objeto y dependencias
 *.o

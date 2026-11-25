@@ -1,0 +1,40 @@
+## compile
+sh bootstrap
+./configure
+make
+
+o, a mano:
+gcc -Wall -Wextra -std=c99 -pedantic -pthread chargen_server.c Socket.c -o chargen_server
+gcc -Wall -Wextra -std=c99 -pedantic getaddresses.c Socket.c -o getaddresses
+gcc -Wall -Wextra -std=c99 -pedantic client.c Socket.c -o client
+
+## run
+### aufgabe 1
+sudo ./chargen_server 19
+./client localhost chargen
+./chargen_server 1919
+./client 127.0.0.1 1919
+./client ::1 1919
+Ctrl + D en el cliente para terminar
+
+### aufgabe 2
+./getaddresses localhost
+./getaddresses www.freebsd.org
+./getaddresses fe80::1%<interfaz>   (ver interfaces: ip addr en Linux, ifconfig en FreeBSD)
+
+Was ist der Unterschied von inet_ntop() und getnameinfo() bei link-lokalen IPv6 Adressen?
+Link-lokale Adressen (fe80::/10) sind nur innerhalb eines Links eindeutig. Deshalb wird
+zusätzlich das Interface benötigt (sin6_scope_id).
+- inet_ntop() bekommt nur die 16 Byte der Adresse (struct in6_addr) und kann das Interface
+  daher nicht ausgeben: fe80::1
+- getnameinfo() bekommt die ganze struct sockaddr_in6 und gibt mit NI_NUMERICHOST auch das
+  Interface aus, wenn sin6_scope_id gesetzt ist: fe80::1%eth0
+
+### aufgabe 3
+./client <host> <servicio>: nombre o IP, y nombre de servicio o puerto
+sudo ./daytime_server 13
+./client localhost daytime
+./daytime_server 1313
+./client localhost 1313
+./client 127.0.0.1 1313
+./client ::1 1313

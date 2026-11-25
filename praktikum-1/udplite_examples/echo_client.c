@@ -40,7 +40,8 @@
 #define BUFFER_SIZE (1 << 16)
 #define MESSAGE_SIZE 9216
 
-static int parse_coverage(const char *arg, int *coverage)
+static int parse_coverage(const char *arg, int *coverage) //EXP: Function to parse the coverage value from the command line argument. It checks if the value is valid (0 or between 8 and 65535) and sets the coverage variable accordingly.
+//EXP: Cant be 7 because the minimum coverage for UDPLite is 8 bytes for the header, and 0 means no coverage (i.e., the entire packet is covered).
 {
     char *end;
     long value;
@@ -84,9 +85,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    fd = Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDPLITE);
-
-    if (setsockopt(fd, IPPROTO_UDPLITE, UDPLITE_SEND_CSCOV,
+    fd = Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDPLITE); //EXP: Create a UDPLITE socket (IPPROTO_UDPLITE) instead of a standard UDP socket (IPPROTO_UDP).
+ 
+    if (setsockopt(fd, IPPROTO_UDPLITE, UDPLITE_SEND_CSCOV, //EXP: Set the send coverage for the UDPLITE socket using setsockopt with the UDPLITE_SEND_CSCOV option.
                    &send_coverage, sizeof(send_coverage)) == -1)
     {
         perror("setsockopt UDPLITE_SEND_CSCOV");
@@ -94,7 +95,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (setsockopt(fd, IPPROTO_UDPLITE, UDPLITE_RECV_CSCOV,
+    if (setsockopt(fd, IPPROTO_UDPLITE, UDPLITE_RECV_CSCOV, //EXP: Set the receive coverage for the UDPLITE socket using setsockopt with the UDPLITE_RECV_CSCOV option.
                    &recv_coverage, sizeof(recv_coverage)) == -1)
     {
         perror("setsockopt UDPLITE_RECV_CSCOV");

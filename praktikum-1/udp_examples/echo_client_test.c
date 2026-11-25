@@ -48,7 +48,7 @@ typedef int socklen_t;
 #define BUFFER_SIZE (1 << 16)
 //#define MESSAGE_SIZE (60000)
 //#define MESSAGE_SIZE (65535)
-#define MESSAGE_SIZE (65507)
+#define MESSAGE_SIZE (65508)
 
 int main(int argc, char **argv)
 {
